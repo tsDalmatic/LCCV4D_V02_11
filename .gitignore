@@ -1,0 +1,34 @@
+# CMake/Ninja output
+/build/
+/cmake-build-*/
+CMakeCache.txt
+CMakeFiles/
+compile_commands.json
+*.elf
+*.map
+*.hex
+*.bin
+*.su
+
+# Keil/MDK generated output and per-user state
+/MDK-ARM/V4D-V02_11/
+/MDK-ARM/RTE/
+/MDK-ARM/DebugConfig/
+*.uvguix.*
+*.uvoptx
+*.lst
+*.lnp
+*.axf
+*.crf
+*.d
+*.dep
+*.htm
+
+# STM32CubeMX temporary data
+mx.scratch/
+
+# Editor and OS files
+.DS_Store
+Thumbs.db
+*.swp
+*~
