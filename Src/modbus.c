@@ -7,6 +7,8 @@
 
 #define MODBUS_TIMEOUT  200 // Modbus reply timeout value (in timerTicks) changed from 240 to 200 to LSis
 #define MODBUS_DELAY      3 // Modbus delay between query (in timerTicks) oprindelig 3 13-09-2018
+#define MODBUS_HEARTBEAT_INTERVAL_MS  200U
+#define MODBUS_HEARTBEAT_REGISTER     0x0004U
 //*******************************************************
 #define dal     0x00  // Dalmatic enkoder valgt
 #define kostal  0x01  // Kostal enkoder valgt
@@ -29,6 +31,8 @@ static uint16_t * dataPtr; // Pointer to destination for parameter read.
 static uint32_t busyTimer; // Timer for measuring query round-trip time.
 
 static HAL_StatusTypeDef uartState = HAL_OK; // Internal modbus state.
+static uint32_t heartbeatTimer;
+static uint16_t heartbeatValue;
 extern uint8_t en_svar;             // control bit for whether encoder have answered
 extern uint8_t e_type;              // 13-12-2021
 //
@@ -53,6 +57,35 @@ HAL_StatusTypeDef getModbusState(void) {
   if (uartState == HAL_BUSY && HAL_GetTick() - busyTimer > MODBUS_TIMEOUT)
     uartState = HAL_TIMEOUT;
   return uartState;
+}
+
+
+// Keep the inverter board's RS485 safety monitor alive outside inverter menus.
+// The read is deliberately scheduled from the normal main loop: if the
+// controller firmware stalls, requests stop and the inverter can time out.
+void serviceModbusHeartbeat(uint8_t enabled) {
+
+  uint32_t now = HAL_GetTick();
+
+  if (enabled == 0U) {
+    heartbeatTimer = now;
+    return;
+  }
+
+  // Foreground parameter reads/writes always have priority. getModbusState()
+  // also advances a missing reply from HAL_BUSY to HAL_TIMEOUT.
+  if (getModbusState() == HAL_BUSY)
+    return;
+
+  if ((uint32_t)(now - heartbeatTimer) < MODBUS_HEARTBEAT_INTERVAL_MS)
+    return;
+
+  heartbeatTimer = now;
+
+  // Register 4 is read-only from the controller's perspective. A valid frame
+  // supplies RS485 activity without changing direction, speed or run commands.
+  (void)getModbusParam((enum modbusParam)MODBUS_HEARTBEAT_REGISTER,
+                       &heartbeatValue);
 }
 
 

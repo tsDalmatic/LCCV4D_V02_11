@@ -65,6 +65,7 @@ HAL_StatusTypeDef getModbusState(void);
 
 HAL_StatusTypeDef setModbusParam(enum modbusParam, uint16_t);
 HAL_StatusTypeDef getModbusParam(enum modbusParam, uint16_t *);
+void serviceModbusHeartbeat(uint8_t enabled);
 
 HAL_StatusTypeDef setStagepar(int, int, uint32_t, uint32_t, uint32_t);
 

@@ -802,6 +802,7 @@ int main(void)
   while (1)
 	{
 	 display_keypad(); // moved to top to get stable multiplex on LED display display	30-10-2023
+	 serviceModbusHeartbeat(inverter_use);
 	 if (READ_BIT(RCC->CSR, RCC_CSR_IWDGRSTF)) e28_wdt = 1; // Error code set by watchdog timeout 29-11-2016
    else e28_wdt = 0;                                      // only cleared by power off or open P/B, if set	
 	 watchdog_on; // processor running monitor output

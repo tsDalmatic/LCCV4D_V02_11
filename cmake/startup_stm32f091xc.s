@@ -278,9 +278,9 @@ g_pfnVectors:
   .size _Check_Sum, 4
 _Check_Sum:
 #ifdef CLASS_B_RELEASE_BUILD
-  .word 0xFF706379
+  .word 0x2D2B2B93
 #else
-  .word 0x16B23A03
+  .word 0x88917ADF
 #endif
 
 /************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/
