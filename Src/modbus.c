@@ -89,6 +89,31 @@ void serviceModbusHeartbeat(uint8_t enabled) {
 }
 
 
+// Validate the new inverter board without writing legacy LSis parameters.
+// This blocking check is used only during controller power-up and an explicit
+// inverter restart. Normal main-loop communication remains non-blocking.
+HAL_StatusTypeDef checkModbusSafetyLink(void) {
+
+  HAL_StatusTypeDef status;
+
+  do {
+    status = getModbusState();
+  } while (status == HAL_BUSY);
+
+  HAL_Delay(MODBUS_DELAY);
+  status = getModbusParam((enum modbusParam)MODBUS_HEARTBEAT_REGISTER,
+                          &heartbeatValue);
+  if (status != HAL_OK)
+    return status;
+
+  do {
+    status = getModbusState();
+  } while (status == HAL_BUSY);
+
+  return status;
+}
+
+
 // Function for configuring inverter parameters. A list of valid parameter
 // codes are present i the modbus.h file (and may be extended as required).
 HAL_StatusTypeDef setModbusParam(enum modbusParam param, uint16_t value) {

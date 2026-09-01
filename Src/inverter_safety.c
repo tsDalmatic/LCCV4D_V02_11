@@ -46,7 +46,7 @@ void restart_modbus() // 14-02-2023
 	{
 	 timeout_modbus++;
 	}
-	while ((timeout_modbus < 4) && (initModbusParam() != HAL_OK)); // 14-02-2023  Max 3 init cycles
+	while ((timeout_modbus < 4) && (checkModbusSafetyLink() != HAL_OK));
 	//	
 	if (timeout_modbus > 3) // more than 7.5 sec. with no answers
 	 {

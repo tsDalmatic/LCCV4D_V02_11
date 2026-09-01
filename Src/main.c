@@ -724,7 +724,7 @@ int main(void)
 	   {
 	    timeout_modbus++;	
 	   }
-	  while ((timeout_modbus < 3) && (initModbusParam() != HAL_OK)); // 16-03-2017  Max 2 init cycles
+	  while ((timeout_modbus < 3) && (checkModbusSafetyLink() != HAL_OK));
 	  //	
 	  if (timeout_modbus > 2) // more than 5.5 sec. with no answers
 	   {

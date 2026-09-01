@@ -47,8 +47,8 @@ After changing firmware:
 
 The GNU startup file contains separate values for the Debug and Release images:
 
-- Debug: `0x88917ADF`
-- Release: `0x2D2B2B93`
+- Debug: `0xA5180F67`
+- Release: `0x7063A25B`
 
 ## Keil and CubeProgrammer
 

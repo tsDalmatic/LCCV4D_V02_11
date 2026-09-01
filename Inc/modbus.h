@@ -60,6 +60,7 @@ enum modbusParam {
 
 
 HAL_StatusTypeDef initModbusParam(void);
+HAL_StatusTypeDef checkModbusSafetyLink(void);
 
 HAL_StatusTypeDef getModbusState(void);
 
