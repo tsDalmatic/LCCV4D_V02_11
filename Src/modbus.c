@@ -7,7 +7,8 @@
 
 #define MODBUS_TIMEOUT  200 // Modbus reply timeout value (in timerTicks) changed from 240 to 200 to LSis
 #define MODBUS_DELAY      3 // Modbus delay between query (in timerTicks) oprindelig 3 13-09-2018
-#define MODBUS_HEARTBEAT_INTERVAL_MS  200U
+/* IC5 on the inverter is an STWD100xX with a 71 ms minimum timeout. */
+#define MODBUS_HEARTBEAT_INTERVAL_MS   25U
 #define MODBUS_HEARTBEAT_REGISTER     0x0004U
 //*******************************************************
 #define dal     0x00  // Dalmatic enkoder valgt
