@@ -73,13 +73,22 @@ void serviceModbusHeartbeat(uint8_t enabled) {
     return;
   }
 
-  // Foreground parameter reads/writes always have priority. getModbusState()
-  // also advances a missing reply from HAL_BUSY to HAL_TIMEOUT.
-  if (getModbusState() == HAL_BUSY)
-    return;
-
   if ((uint32_t)(now - heartbeatTimer) < MODBUS_HEARTBEAT_INTERVAL_MS)
     return;
+
+  // Foreground parameter reads/writes normally complete before the next
+  // heartbeat deadline and therefore retain priority. If a reply is lost,
+  // do not let the legacy 200-tick Modbus timeout suppress all RS485 traffic:
+  // recover the receive side once the outstanding transaction itself is at
+  // least one heartbeat interval old, then transmit the next safety frame.
+  if (getModbusState() == HAL_BUSY) {
+    if ((uint32_t)(now - busyTimer) < MODBUS_HEARTBEAT_INTERVAL_MS)
+      return;
+
+    (void)HAL_UART_AbortReceive(&huart4);
+    __HAL_UART_FLUSH_DRREGISTER(&huart4);
+    uartState = HAL_TIMEOUT;
+  }
 
   heartbeatTimer = now;
 
