@@ -188,18 +188,14 @@ void learn_wd_circuit() // 11-11-2021
    if (ad_wicket > 4050) // is it a NC contact in the wicket terminals
     {
      EE_write(EE_par_24,5);
-     serviceModbusHeartbeat(inverter_use);
     }
    else
     {
      EE_write(EE_par_24,4);
-     serviceModbusHeartbeat(inverter_use);
     }
    adr = EE_WD_value;
    write_int16_eeprom();
-   serviceModbusHeartbeat(inverter_use);
    EE_write(EE_learn_wd_ready,1);
-   serviceModbusHeartbeat(inverter_use);
   }
 }
 //************************************************************************
@@ -1146,21 +1142,15 @@ else if (a_digit == 5)
         new_EE = 0; // this new EE is saved on uP2
         confirm_learn = 1;
 				EE_write(EE_learn_wd_ready, 0); // 11-10-2021
-        serviceModbusHeartbeat(inverter_use);
         learn_wd_circuit(); // 10-11-2021 
 				calc_EE_cksum(); // calculate safety EEPROM adresses and saved in temp3 10-11-2021
         EE_write(EE_pu_check, temp3); // save in EE_pu_check for later test 10-11-2021 
-        serviceModbusHeartbeat(inverter_use);
         EE_write(EE_par_13, 5); // preset to centervalue when new limit learned
-        serviceModbusHeartbeat(inverter_use);
         EE_write(EE_par_41, 0); // preset to no speedcontrol when changing limits 10-12-09
-        serviceModbusHeartbeat(inverter_use);
         EE_read(EE_par_31);
         if ((temp == 4) || (temp == 6)) EE_write(EE_relearn_ph1, 1); // photo1 in frame is active - relearn needed 06-10-2010
         if ((temp == 5) || (temp == 7)) EE_write(EE_relearn_ph2, 1); // photo1 in frame is active - relearn needed 06-10-2010
-        serviceModbusHeartbeat(inverter_use);
 				EE_write(EE_curtain_rep_saved, 0); // 12-02-2020 
-        serviceModbusHeartbeat(inverter_use);
 				p_value = 0;
         para_test = 0;
         par_val = 0;
@@ -1242,25 +1232,18 @@ else if (a_digit == 5)
 				direction_setup_ok = 1; // set if not set because limits are only moved a little 30-04-2019
 				direction_setup_tst_bit = 0; 
 				EE_write(EE_learning_ok,1); // 27-03-2019 
-        serviceModbusHeartbeat(inverter_use);
         new_EE = 0; // this new EE is saved on uP2
         confirm_learn = 1;
 				EE_write(EE_learn_wd_ready, 0); // 11-10-2021
-        serviceModbusHeartbeat(inverter_use);
         learn_wd_circuit(); // 10-11-2021 
 				calc_EE_cksum(); // calculate safety EEPROM adresses and saved in temp3 10-11-2021
         EE_write(EE_pu_check, temp3); // save in EE_pu_check for later test 10-11-2021  
-        serviceModbusHeartbeat(inverter_use);
         EE_write(EE_par_15, 5); // preset to centervalue when new limit learned
-        serviceModbusHeartbeat(inverter_use);
         EE_write(EE_par_41, 0); // preset to no speedcontrol when changing limits 10-12-09
-        serviceModbusHeartbeat(inverter_use);
         EE_read(EE_par_31);
         if ((temp == 4) || (temp == 6)) EE_write(EE_relearn_ph1, 1); // photo1 in frame is active - relearn needed 06-10-2010
         if ((temp == 5) || (temp == 7)) EE_write(EE_relearn_ph2, 1); // photo1 in frame is active - relearn needed 06-10-201
-        serviceModbusHeartbeat(inverter_use);
 				EE_write(EE_curtain_rep_saved, 0);  
-        serviceModbusHeartbeat(inverter_use);
         p_value = 0;
         para_test = 0;
         par_val = 0;

@@ -17,6 +17,7 @@
 
 #include "stm32f0xx_hal.h"
 #include "eprom.h"
+#include "modbus.h"
 #include "Global_Var.h"
 #include "Defines.h"
 
@@ -44,6 +45,7 @@ extern uint32_t data;             // Data for 16 bit read and write!
 
 extern uint8_t e21_fail;          // EPROM access error flag.
 extern uint8_t something_saved;   // Test for something saved in EEPROM 
+extern uint8_t inverter_use;       // 1 = inverter use is active, else contactor use
 
 
 static uint8_t eprom[EPROM_SIZE]; // Defining array 
@@ -223,5 +225,9 @@ static void write_eeprom(uint16_t ad, uint8_t da)
     e21_fail = 0;
   epromTimer = HAL_GetTick();
 	HAL_IWDG_Refresh(&hiwdg); // 28-11-2016 refresh to prevent WDT timeout of 50mS this is needed especially when EEPROM is new
+	// Long, multi-byte limit saves must not starve the inverter safety link.
+	// Service only after the I2C write returns, so a stalled EEPROM transaction
+	// still causes the external safety watchdog to time out.
+	serviceModbusHeartbeat(inverter_use);
 	something_saved = 1; // test bit for saving in EEPROM 02-02-2017
 }
