@@ -63,13 +63,18 @@ void select_error(uint8_t temp);
 void chk_inverter_status(void);
 void calc_a_secment(void);
 void calc_a_secment_main(void);
-void IC7_load(void);
+static void IC7_load(uint8_t segment);
+void refreshLedDisplay(void);
 void secment_value(void);
 void calc_a_secment_p(void);
 void show_led_p_num(void);
 //
 uint8_t a_digit;                       // LED display counter for digit according to the multiplexing proces
 uint8_t a_secment;                     // LED display active secments
+static volatile uint8_t led_segment_buffer[5] = {0xFFU, 0xFFU, 0xFFU, 0xFFU, 0xFFU};
+static volatile uint8_t led_display_enabled;
+static volatile uint8_t led_refresh_ready;
+static uint8_t led_refresh_digit;
 //
 uint8_t ds_byte[8]; 			             // array with 8 bytes
 uint8_t value_changed;                 // test bit for fine adjustment
@@ -248,48 +253,14 @@ if (confirm_timer == 0) show_photo_dis_point = 0; //27-06-2024 moved from encode
 // 
 if ((gdv1 == 0) | (run_prog == 1))
  {
-	switch (a_digit)
-   {
-    case 1:
-    //digit_4_on; // T5 OFF V7E display colon digit 3 and 4
-		digit_2_on; // T8 OFF LCCV4D display colon is digit 2 and 3 06-05-2022
-    digit_3_on; // T7 OFF
-    IC7_load();
-    digit_1_off; // T9 ON
-    break;
-    case 2:
-    digit_1_on; // T9 OFF
-    IC7_load();
-    digit_2_off; // T8 ON
-    break;
-    case 3:
-    digit_2_on; // T8 OFF
-    IC7_load();
-    digit_3_off; // T7 ON
-    break;
-    case 4:
-    digit_3_on; // T7 OFF
-    IC7_load();
-    digit_4_off; // T5 ON
-    break;
-    case 5:
-		digit_4_on; // T5 OFF V7E display colon digit 3 and 4
-    IC7_load();
-		digit_2_off; // T8 ON LCCV4D display colon is digit 2 and 3 06-05-2022
-    digit_3_off; // T7 ON
-    //digit_4_off; // T5 ON V7E display colon digit 3 and 4
-    break;
-    default:
-    break;
-   }   
+  led_segment_buffer[a_digit - 1U] = a_secment;
+  led_display_enabled = 1U;
  }
 else // graphic display used turn off LED
  {
-	digit_1_on; // T9 OFF
-	digit_2_on; // T8 OFF 
-	digit_3_on; // T7 OFF
-	digit_4_on; // T5 OFF 
+  led_display_enabled = 0U;
  }
+led_refresh_ready = 1U;
 //
 // 
 if ((gdv1 == 1) || (parameter == 5))
@@ -6397,47 +6368,104 @@ void secment_value()
 //************************************************************************
 
 //************************************************************************
-void IC7_load() // manuel serial transfering a_secment to IC7 storage register
+// Scan the cached LED data from SysTick. SysTick runs at 900 Hz, so the five
+// multiplex slots are refreshed at about 180 Hz without accelerating menu or
+// controller logic in the 3.33 ms main loop.
+void refreshLedDisplay(void)
+ {
+  if (led_refresh_ready == 0U)
+    return;
+
+  if (led_display_enabled == 0U)
+   {
+    digit_1_on; // T9 OFF
+    digit_2_on; // T8 OFF
+    digit_3_on; // T7 OFF
+    digit_4_on; // T5 OFF
+    return;
+   }
+
+  led_refresh_digit++;
+  if (led_refresh_digit > 5U) led_refresh_digit = 1U;
+
+  switch (led_refresh_digit)
+   {
+    case 1:
+     digit_2_on; // T8 OFF; colon uses digit 2 and 3 on LCCV4D
+     digit_3_on; // T7 OFF
+     IC7_load(led_segment_buffer[0]);
+     digit_1_off; // T9 ON
+     break;
+    case 2:
+     digit_1_on; // T9 OFF
+     IC7_load(led_segment_buffer[1]);
+     digit_2_off; // T8 ON
+     break;
+    case 3:
+     digit_2_on; // T8 OFF
+     IC7_load(led_segment_buffer[2]);
+     digit_3_off; // T7 ON
+     break;
+    case 4:
+     digit_3_on; // T7 OFF
+     IC7_load(led_segment_buffer[3]);
+     digit_4_off; // T5 ON
+     break;
+    case 5:
+     digit_4_on; // T5 OFF
+     IC7_load(led_segment_buffer[4]);
+     digit_2_off; // T8 ON; colon uses digit 2 and 3 on LCCV4D
+     digit_3_off; // T7 ON
+     break;
+    default:
+     led_refresh_digit = 0U;
+     break;
+   }
+ }
+//************************************************************************
+
+//************************************************************************
+static void IC7_load(uint8_t segment) // manual serial transfer to IC7 storage register
  {
   disp_clk_off; // ready for new date
   disp_str_off;// ready for new data
   //
-  if (bit_test(a_secment,7)) disp_data_on; //
+  if (bit_test(segment,7)) disp_data_on; //
   else disp_data_off; //
   disp_clk_on; //
   disp_clk_off; //
   //
-  if( bit_test(a_secment,6)) disp_data_on; //
+  if( bit_test(segment,6)) disp_data_on; //
   else disp_data_off; //
   disp_clk_on; //
   disp_clk_off; //
   //
-  if( bit_test(a_secment,5)) disp_data_on; //
+  if( bit_test(segment,5)) disp_data_on; //
   else disp_data_off; //
   disp_clk_on; //
   disp_clk_off; //
   //
-  if( bit_test(a_secment,4)) disp_data_on; //
+  if( bit_test(segment,4)) disp_data_on; //
   else disp_data_off; //
   disp_clk_on; //
   disp_clk_off; //
   //
-  if( bit_test(a_secment,3)) disp_data_on; //
+  if( bit_test(segment,3)) disp_data_on; //
   else disp_data_off; //
   disp_clk_on; //
   disp_clk_off; //
   //
-  if( bit_test(a_secment,2)) disp_data_on; //
+  if( bit_test(segment,2)) disp_data_on; //
   else disp_data_off; //
   disp_clk_on; //
   disp_clk_off; //
   //
-  if( bit_test(a_secment,1)) disp_data_on; //
+  if( bit_test(segment,1)) disp_data_on; //
   else disp_data_off; //
   disp_clk_on; //
   disp_clk_off; //
   //
-  if( bit_test(a_secment,0)) disp_data_on; //
+  if( bit_test(segment,0)) disp_data_on; //
   else disp_data_off; //
   disp_clk_on; //
   disp_clk_off; //
