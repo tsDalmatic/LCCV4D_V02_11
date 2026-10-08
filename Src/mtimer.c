@@ -11,8 +11,14 @@ extern void r_autoclose_timer(void);
 extern uint8_t open_active(void);           // special inverter functions
 extern uint8_t close_active(void);          // special inverter functions
 extern uint16_t pwr_timer_SER;
-uint8_t autoclose_ext;             // time extender for autoclosing
 uint16_t photo_active_time;        // photo beam break time for car wash function
+
+#define AUTOCLOSE_UNITS_PER_SECOND       50U
+#define SYSTEM_TICKS_PER_SECOND         900U
+#define AUTOCLOSE_TICKS_PER_UNIT        (SYSTEM_TICKS_PER_SECOND / AUTOCLOSE_UNITS_PER_SECOND)
+static uint32_t autoclose_tick;
+static uint8_t autoclose_tick_initialized;
+
 uint8_t contactor_off_tim = 7;  	 // preset at startup to prevent uintended activate 05-11-2021
 uint8_t up_relay_tim;              // 05-11-2021
 uint8_t down_relay_tim;            // 05-11-2021
@@ -143,23 +149,37 @@ if ((close_pb == 1) || (close_disp_pb)) // 08-07-2026
   autoclose_timer = 0; // 01-12-2021
   interlock = 0; //01-12-2021
  }	
-if (autoclose_ext == 0)
+// Keep parameter 32 in its existing 1/50-second units, but derive elapsed
+// time from the 900 Hz system tick instead of assuming every main-loop pass
+// takes exactly 3.33 ms. This prevents Class-B, display and communication
+// workload from making the auto-close countdown run slow.
+uint32_t autoclose_now = HAL_GetTick();
+if (autoclose_tick_initialized == 0U)
  {
-  autoclose_ext = 5; // changed from 9 to 5 after main cycle change from 2 mS to 3.33mS
+  autoclose_tick = autoclose_now;
+  autoclose_tick_initialized = 1U;
+ }
+uint32_t autoclose_elapsed = (uint32_t)(autoclose_now - autoclose_tick);
+if (autoclose_elapsed >= AUTOCLOSE_TICKS_PER_UNIT)
+ {
+  uint32_t autoclose_units = autoclose_elapsed / AUTOCLOSE_TICKS_PER_UNIT;
+  uint8_t autoclose_count_enabled = 0U;
+  autoclose_tick += autoclose_units * AUTOCLOSE_TICKS_PER_UNIT;
+
   EE_read(EE_par_33);
-  if (temp > 0) 
+  if (temp > 0)
    {
-    if (photoclose == 1)
-     {
-      if ((autoclose_timer != 0) && (interlock == 0)) autoclose_timer--; // car wash function selected and photoclose testbit active 01-12-2021
-     }
+    if (photoclose == 1) autoclose_count_enabled = 1U;
    }
-  else
+  else autoclose_count_enabled = 1U;
+
+  if ((autoclose_count_enabled == 1U) &&
+      (autoclose_timer != 0U) && (interlock == 0U))
    {
-    if ((autoclose_timer != 0) && (interlock == 0)) autoclose_timer--; // car wash function not selected 01-12-2021
+    if (autoclose_units >= autoclose_timer) autoclose_timer = 0U;
+    else autoclose_timer -= (uint16_t)autoclose_units;
    }
- } 
-else autoclose_ext--; 
+ }
 //********
 if (force_closing_time_ext == 0) // 23-08-2011
  {

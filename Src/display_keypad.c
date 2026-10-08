@@ -5769,8 +5769,8 @@ void display_auto()
   }
  else
   {
-   temp2 = autoclose_timer;
-   temp2 = temp2/50; // time for this is about 50uS - Temp2 is now seconds
+   // Round remaining time up so zero is shown only when auto-close expires.
+   temp2 = (uint16_t)(((uint32_t)autoclose_timer + 49U) / 50U);
 	 if (gdv1 == 1)
 	  {		 
 	   ds_byte[0] = 0;  //Run mode display
