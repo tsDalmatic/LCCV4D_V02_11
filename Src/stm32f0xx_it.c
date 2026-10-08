@@ -50,7 +50,6 @@ extern uint8_t rx_buffer[7];        // 7 bytes needed to copy uart2_buf
 extern uint8_t pack_56[3];          // array for SCE encoder package with 56 header 14-01-2021
 extern uint8_t pack_3a[7];          // array for SCE encoder package with 3a header 14-01-2021
 extern uint8_t pack_3b[6];          // array for SCE encoder package with 3b header 14-01-2021
-extern void refreshLedDisplay(void);
 /* USER CODE END 0 */
 
 /* External variables --------------------------------------------------------*/
@@ -136,7 +135,6 @@ void SysTick_Handler(void)
   HAL_IncTick();
   HAL_SYSTICK_IRQHandler();
   /* USER CODE BEGIN SysTick_IRQn 1 */
-  refreshLedDisplay();
    /* Verify TickCounter integrity */
   if ((TickCounter ^ TickCounterInv) == 0xFFFFFFFFuL)
   {

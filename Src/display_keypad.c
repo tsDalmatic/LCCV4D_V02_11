@@ -73,7 +73,6 @@ uint8_t a_digit;                       // LED display counter for digit accordin
 uint8_t a_secment;                     // LED display active secments
 static volatile uint8_t led_segment_buffer[5] = {0xFFU, 0xFFU, 0xFFU, 0xFFU, 0xFFU};
 static volatile uint8_t led_display_enabled;
-static volatile uint8_t led_refresh_ready;
 static uint8_t led_refresh_digit;
 //
 uint8_t ds_byte[8]; 			             // array with 8 bytes
@@ -260,7 +259,6 @@ else // graphic display used turn off LED
  {
   led_display_enabled = 0U;
  }
-led_refresh_ready = 1U;
 //
 // 
 if ((gdv1 == 1) || (parameter == 5))
@@ -6368,14 +6366,10 @@ void secment_value()
 //************************************************************************
 
 //************************************************************************
-// Scan the cached LED data from SysTick. SysTick runs at 900 Hz, so the five
-// multiplex slots are refreshed at about 180 Hz without accelerating menu or
-// controller logic in the 3.33 ms main loop.
+// Scan cached LED data from the main loop and its idle wait. Keeping GPIO
+// switching out of SysTick prevents it from pre-empting push-button sampling.
 void refreshLedDisplay(void)
  {
-  if (led_refresh_ready == 0U)
-    return;
-
   if (led_display_enabled == 0U)
    {
     digit_1_on; // T9 OFF

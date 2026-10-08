@@ -129,6 +129,7 @@ extern void adap_run_time(void);
 extern void read_ad_inputs(void);
 extern void last_error_upd(void);
 extern void display_keypad(void);
+extern void refreshLedDisplay(void);
 extern void push_code_req(void);
 extern void req_photo_learn(void);
 extern void req_status_wanted(void);
@@ -803,6 +804,7 @@ int main(void)
 	{
 	 timeTick1 = HAL_GetTick(); // Include display and Modbus work in the fixed 3.33 ms loop period
 	 display_keypad(); // moved to top to get stable multiplex on LED display display	30-10-2023
+	 refreshLedDisplay(); // refresh outside interrupt context so button sampling cannot be pre-empted
 	 serviceModbusHeartbeat(inverter_use);
 	 if (READ_BIT(RCC->CSR, RCC_CSR_IWDGRSTF)) e28_wdt = 1; // Error code set by watchdog timeout 29-11-2016
    else e28_wdt = 0;                                      // only cleared by power off or open P/B, if set	
@@ -914,8 +916,15 @@ int main(void)
 		//option_on; // debug	
     timeTick2 = HAL_GetTick();	
     timetick_calc = timeTick2 - timeTick1;			
+    uint32_t ledRefreshTick = timeTick2;
 		while (HAL_GetTick() - timeTick1 < 3) // 
   	 {
+      uint32_t currentTick = HAL_GetTick();
+      if (currentTick != ledRefreshTick)
+       {
+        ledRefreshTick = currentTick;
+        refreshLedDisplay();
+       }
 		 } // Wait for next loop period of 3.33 ms
 	  timeTick3 = HAL_GetTick();	
     timetick_calc2 = timeTick3 - timeTick1;
