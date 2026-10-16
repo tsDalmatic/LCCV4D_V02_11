@@ -2,6 +2,21 @@
 
 Firmware for the Dalmatic LCCV4D controller, targeting the STM32F091VC.
 
+The build now defaults to the STM32 V/f inverter configuration handshake
+(`LCC_CUSTOM_INVERTER=1`). Set the CMake option `LCC_CUSTOM_INVERTER=OFF`
+for the existing M100 products. The shared wire contract is in
+`Inc/inverter_protocol.h`. Inverter menu values are read-only for phase 1;
+the commissioned 35/50 Hz profile is stored separately at EEPROM 0x200..0x227.
+After a communication fault, STOP acknowledgement is required before RUN is
+permitted again. See the inverter project's `docs/inverter_handshake.md`.
+
+The controller retries an isolated malformed or missing reply without dropping
+RUN. A continuous 100 ms interval without any valid acknowledgement still
+latches E27 and stops motion. `CustomInverter_ReplyErrorCount` records all such
+reply errors and `CustomInverter_ReplyErrorStreak` returns to zero after the
+next valid reply. The non-safety status read runs every 250 ms; changing
+heartbeats remain at 25 ms.
+
 ## Build
 
 Requirements:
@@ -47,8 +62,8 @@ After changing firmware:
 
 The GNU startup file contains separate values for the Debug and Release images:
 
-- Debug: `0x8BE69872`
-- Release: `0xC108DC57`
+- Debug: `0x7ED227EB`
+- Release: `0xB6705429`
 
 ## Keil and CubeProgrammer
 

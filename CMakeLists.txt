@@ -5,6 +5,7 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_EXTENSIONS ON)
 
 project(V4D-V02_11 LANGUAGES C ASM)
+option(LCC_CUSTOM_INVERTER "Use the Dalmatic STM32 V/f inverter handshake" ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS TRUE)
 
 set(HAL_SOURCES
@@ -91,6 +92,7 @@ target_include_directories(${PROJECT_NAME} PRIVATE
 )
 
 target_compile_definitions(${PROJECT_NAME} PRIVATE
+    LCC_CUSTOM_INVERTER=$<BOOL:${LCC_CUSTOM_INVERTER}>
     USE_HAL_DRIVER
     STM32F091xC
     $<$<CONFIG:Release>:CLASS_B_RELEASE_BUILD>

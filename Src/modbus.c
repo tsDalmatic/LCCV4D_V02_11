@@ -4,6 +4,7 @@
 #include <modbus.h>
 #include "Defines.h"
 #include "Global_Var.h"
+#include "custom_inverter.h"
 
 #define MODBUS_TIMEOUT  200 // Modbus reply timeout value (in timerTicks) changed from 240 to 200 to LSis
 #define MODBUS_DELAY      3 // Modbus delay between query (in timerTicks) oprindelig 3 13-09-2018
@@ -31,7 +32,7 @@ static uint8_t rxFrame[8]; // Buffer for modbus receive data frame.
 static uint16_t * dataPtr; // Pointer to destination for parameter read.
 static uint32_t busyTimer; // Timer for measuring query round-trip time.
 
-static HAL_StatusTypeDef uartState = HAL_OK; // Internal modbus state.
+static volatile HAL_StatusTypeDef uartState = HAL_OK; // Shared with UART callbacks.
 static uint32_t heartbeatTimer;
 static uint16_t heartbeatValue;
 extern uint8_t en_svar;             // control bit for whether encoder have answered
@@ -55,8 +56,11 @@ extern uint8_t disp_svar;						// checkbit for display responds
 // timeout-check, dealing with the absence of a modbus reply.
 HAL_StatusTypeDef getModbusState(void) {
 	//HAL_IWDG_Refresh(&hiwdg); // must be refreshed because modbus init and settings take approx. 410mS + 50 mS
-  if (uartState == HAL_BUSY && HAL_GetTick() - busyTimer > MODBUS_TIMEOUT)
+  if (uartState == HAL_BUSY && HAL_GetTick() - busyTimer > (LCC_CUSTOM_INVERTER ? 40U : MODBUS_TIMEOUT)) {
+    (void)HAL_UART_AbortReceive(&huart4);
+    __HAL_UART_FLUSH_DRREGISTER(&huart4);
     uartState = HAL_TIMEOUT;
+  }
   return uartState;
 }
 
@@ -65,6 +69,7 @@ HAL_StatusTypeDef getModbusState(void) {
 // The read is deliberately scheduled from the normal main loop: if the
 // controller firmware stalls, requests stop and the inverter can time out.
 void serviceModbusHeartbeat(uint8_t enabled) {
+  if (LCC_CUSTOM_INVERTER) { CustomInverter_Service(enabled); return; }
 
   uint32_t now = HAL_GetTick();
 
@@ -103,6 +108,7 @@ void serviceModbusHeartbeat(uint8_t enabled) {
 // This blocking check is used only during controller power-up and an explicit
 // inverter restart. Normal main-loop communication remains non-blocking.
 HAL_StatusTypeDef checkModbusSafetyLink(void) {
+  if (LCC_CUSTOM_INVERTER) return CustomInverter_CheckLink();
 
   HAL_StatusTypeDef status;
 
@@ -127,6 +133,7 @@ HAL_StatusTypeDef checkModbusSafetyLink(void) {
 // Function for configuring inverter parameters. A list of valid parameter
 // codes are present i the modbus.h file (and may be extended as required).
 HAL_StatusTypeDef setModbusParam(enum modbusParam param, uint16_t value) {
+  if (getModbusState() == HAL_BUSY) return HAL_BUSY;
 
   uint16_t crc = 0xFFFF; // Checksum calculation preload value
   //HAL_IWDG_Refresh(&hiwdg); // must be refreshed because modbus init and settings take approx. 410mS + 50 mS
@@ -175,6 +182,7 @@ HAL_StatusTypeDef setModbusParam(enum modbusParam param, uint16_t value) {
 // Function for obtaining inverter parameters. A list of valid parameter
 // codes are present i the modbus.h file (and may be extended as required).
 HAL_StatusTypeDef getModbusParam(enum modbusParam param, uint16_t* value) {
+  if (getModbusState() == HAL_BUSY) return HAL_BUSY;
 
   uint16_t crc = 0xFFFF; // Checksum calculation preload value
 
@@ -398,9 +406,13 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef * huart)
 	 {
   uint16_t crc = 0xFFFF;
 
+  if (huart->Instance != USART4 || uartState != HAL_BUSY) return;
+  if (rxFrame[0] != txFrame[0]) { uartState = HAL_ERROR; return; }
+
   // Acting according to function code.
   switch (rxFrame[1]) {
     case 0x03:  // Parameter read, 1st part.
+      if (txFrame[1] != 0x03 || rxFrame[2] != 2U) { uartState = HAL_ERROR; return; }
       rxFrame[1]++; // Prepare for 2nd part.
       HAL_UART_Receive_IT(&huart4, rxFrame+5, 2); // 05-11-2021
       return;
@@ -426,6 +438,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef * huart)
       return;
 
     case 0x06: // Parameter write, 1st part.
+      if (txFrame[1] != 0x06) { uartState = HAL_ERROR; return; }
       rxFrame[1]++; // Prepare for 2nd part.
       HAL_UART_Receive_IT(&huart4, rxFrame+5, 3); // 05-11-2021
       return;

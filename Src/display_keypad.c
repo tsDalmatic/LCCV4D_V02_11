@@ -4,6 +4,7 @@
 #include <main.h>
 #include <eprom.h>
 #include <modbus.h>
+#include "custom_inverter.h"
 static HAL_StatusTypeDef status = HAL_OK; // definering af status og start initialisering er HAL_OK
 extern UART_HandleTypeDef huart3;
 extern UART_HandleTypeDef huart7;
@@ -174,7 +175,9 @@ else // temp_104 = 50, 60 or 100Hz
  	if (temp_104 == 5000) temp_104 = 50;
   else if (temp_104 == 6000) temp_104 = 60;
 	else if (temp_104 == 10000) temp_104 = 100; 
-  slip_calc = ((temp_104 * 60/(pole_count-2)) - temp_103);
+  if (pole_count != 2U && pole_count != 4U && pole_count != 6U) { slip_calc = 0U; return; }
+  uint32_t sync_rpm = 120UL * temp_104 / pole_count;
+  slip_calc = (temp_103 < sync_rpm) ? (uint16_t)(sync_rpm - temp_103) : 0U;
 	if (slip_calc > 3000) slip_calc = 3000; // 3000 rpm is max
 	if (slip_calc < 1) slip_calc = 1;   // 1 is min- 0 is also ok for S100 but not possible in real life 
 }	
@@ -997,6 +1000,26 @@ else if (a_digit == 5)
  ds_byte[7] = 0; // not in use in prog mode yet
  //*********************************************************************************************************************
  //*********************************************************************************************************************
+ /* Phase 1 exposes the transported profile read-only. Position percentages
+  * remain on the existing controller menu and EEPROM path. */
+ if (LCC_CUSTOM_INVERTER && parameter >= 100U && parameter <= 124U && parameter != 115U) {
+   static const uint8_t segments[10] = {0xC0,0xF9,0xA4,0xB0,0x99,0x92,0x82,0xF8,0x80,0x90};
+   uint16_t value = CustomInverter_GetMenu(parameter);
+   ds_byte[0]=1; ds_byte[1]=parameter; ds_byte[2]=0;
+   ds_byte[3]=(uint8_t)value; ds_byte[4]=(uint8_t)(value>>8);
+   new_EE=0U;
+   if (!p_value) value=parameter;
+   else if (parameter==104U || parameter==109U || parameter==110U || parameter==111U || parameter==120U || parameter==121U) value/=100U;
+   if (a_digit>=1U && a_digit<=4U) {
+     static const uint16_t divisors[4]={1000,100,10,1};
+     a_secment=segments[(value/divisors[a_digit-1U])%10U];
+     if (p_value && ((parameter==100U && a_digit==1U) ||
+         ((parameter==102U || parameter==112U || parameter==113U || parameter==114U ||
+           parameter==122U || parameter==123U || parameter==124U) && a_digit==3U)))
+       a_secment &= 0x7FU;
+   }
+   return;
+ }
  switch (parameter) 
   {
     case 1: // parameter 01 selected
@@ -6141,6 +6164,11 @@ void select_error(uint8_t temp)
 
 void chk_inverter_status()
 {
+ if (LCC_CUSTOM_INVERTER) {
+   e31_inverter = (CustomInverter_State == INV_REJECTED);
+   inv_fail_active = e31_inverter ? 0xB0U : 0U;
+   return;
+ }
  status = getModbusState();
  if (status == HAL_BUSY)
 	{

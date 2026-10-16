@@ -2,7 +2,7 @@
     "version": "2.0.0",
     "tasks": [
         {
-            "label": "CMake Configure",
+            "label": "LCCV4D: CMake Configure",
             "type": "shell",
             "command": "cmake",
             "args": [
@@ -17,7 +17,7 @@
             "problemMatcher": []
         },
         {
-            "label": "CMake Build",
+            "label": "LCCV4D: CMake Build",
             "type": "shell",
             "command": "cmake",
             "args": [
@@ -32,13 +32,13 @@
                 "kind": "build",
                 "isDefault": true
             },
-            "dependsOn": "CMake Configure",
+            "dependsOn": "LCCV4D: CMake Configure",
             "problemMatcher": [
                 "$gcc"
             ]
         },
         {
-            "label": "CMake Clean",
+            "label": "LCCV4D: CMake Clean",
             "type": "shell",
             "command": "cmake",
             "args": [
@@ -55,34 +55,34 @@
             "problemMatcher": []
         },
         {
-            "label": "Flash (ST-LINK)",
+            "label": "LCCV4D: Flash (ST-LINK)",
             "type": "shell",
             "command": "& 'C:\\Program Files\\STMicroelectronics\\STM32Cube\\STM32CubeProgrammer\\bin\\STM32_Programmer_CLI.exe' -c port=SWD mode=UR reset=HWrst freq=400 -w '${workspaceFolder}/build/Debug/V4D-V02_11.elf' -v -rst",
             "group": "test",
             "problemMatcher": []
         },
         {
-            "label": "Flash (ST-LINK Hotplug)",
+            "label": "LCCV4D: Flash (ST-LINK Hotplug)",
             "type": "shell",
             "command": "& 'C:\\Program Files\\STMicroelectronics\\STM32Cube\\STM32CubeProgrammer\\bin\\STM32_Programmer_CLI.exe' -c port=SWD mode=HOTPLUG reset=SWrst freq=400 -w '${workspaceFolder}/build/Debug/V4D-V02_11.elf' -v -rst",
             "group": "test",
             "problemMatcher": []
         },
         {
-            "label": "Build and Flash",
+            "label": "LCCV4D: Build and Flash",
             "dependsOn": [
-                "CMake Build",
-                "Flash (ST-LINK)"
+                "LCCV4D: CMake Build",
+                "LCCV4D: Flash (ST-LINK)"
             ],
             "dependsOrder": "sequence",
             "group": "test",
             "problemMatcher": []
         },
         {
-            "label": "Build and Flash Hotplug",
+            "label": "LCCV4D: Build and Flash Hotplug",
             "dependsOn": [
-                "CMake Build",
-                "Flash (ST-LINK Hotplug)"
+                "LCCV4D: CMake Build",
+                "LCCV4D: Flash (ST-LINK Hotplug)"
             ],
             "dependsOrder": "sequence",
             "group": "test",

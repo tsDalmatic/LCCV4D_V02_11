@@ -2,7 +2,7 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Cortex Debug",
+            "name": "LCCV4D STM32F091 - Program + Live Watch",
             "cwd": "${workspaceFolder}",
             "executable": "${workspaceFolder}/build/Debug/V4D-V02_11.elf",
             "request": "launch",
@@ -15,9 +15,38 @@
                 "--frequency",
                 "1000"
             ],
+            "showDevDebugOutput": "raw",
+            "showDevDebugTimestamps": true,
+            "liveWatch": {
+                "enabled": true,
+                "samplesPerSecond": 2
+            },
             "gdbPath": "C:/ST/STM32CubeIDE_2.1.1/STM32CubeIDE/plugins/com.st.stm32cube.ide.mcu.externaltools.gnu-tools-for-stm32.14.3.rel1.win32_1.0.100.202602081740/tools/bin/arm-none-eabi-gdb.exe",
             "armToolchainPath": "C:/ST/STM32CubeIDE_2.1.1/STM32CubeIDE/plugins/com.st.stm32cube.ide.mcu.externaltools.gnu-tools-for-stm32.14.3.rel1.win32_1.0.100.202602081740/tools/bin",
-            "preLaunchTask": "CMake Build",
+            "preLaunchTask": "LCCV4D: CMake Build",
+            "svdFile": ""
+        },
+        {
+            "name": "LCCV4D STM32F091 - Attach Live Watch (no flash)",
+            "cwd": "${workspaceFolder}",
+            "executable": "${workspaceFolder}/build/Debug/V4D-V02_11.elf",
+            "request": "attach",
+            "type": "cortex-debug",
+            "servertype": "stlink",
+            "device": "STM32F091VC",
+            "interface": "swd",
+            "serverArgs": [
+                "--frequency",
+                "1000"
+            ],
+            "showDevDebugOutput": "raw",
+            "showDevDebugTimestamps": true,
+            "liveWatch": {
+                "enabled": true,
+                "samplesPerSecond": 2
+            },
+            "gdbPath": "C:/ST/STM32CubeIDE_2.1.1/STM32CubeIDE/plugins/com.st.stm32cube.ide.mcu.externaltools.gnu-tools-for-stm32.14.3.rel1.win32_1.0.100.202602081740/tools/bin/arm-none-eabi-gdb.exe",
+            "armToolchainPath": "C:/ST/STM32CubeIDE_2.1.1/STM32CubeIDE/plugins/com.st.stm32cube.ide.mcu.externaltools.gnu-tools-for-stm32.14.3.rel1.win32_1.0.100.202602081740/tools/bin",
             "svdFile": ""
         }
     ]

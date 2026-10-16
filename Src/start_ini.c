@@ -5,6 +5,7 @@
 #include "eprom.h"
 #include "encoder.h"
 #include "modbus.h"
+#include "custom_inverter.h"
 static HAL_StatusTypeDef status = HAL_OK; // definering af status og start initialisering er HAL_OK
 extern UART_HandleTypeDef huart2;
 extern IWDG_HandleTypeDef hiwdg;
@@ -430,6 +431,7 @@ void clr_val()
 //
 void new_inverter_setup() // setup of other inverter parameters except 115 and 125  
  { 
+  if (LCC_CUSTOM_INVERTER) { CustomInverter_RequestConfiguration(); return; }
 	do
 	 {		
 	  HAL_IWDG_Refresh(&hiwdg); // 14-03-2017 refresh to prevent WDT timeout of 50mS
@@ -686,6 +688,7 @@ void new_inverter_setup() // setup of other inverter parameters except 115 and 1
  //
  void inverter_para_check() // 21-05-2017
  {
+  if (LCC_CUSTOM_INVERTER) return;
 	HAL_IWDG_Refresh(&hiwdg); // refresh to prevent WDT timeout of 50mS 
 	EEPROM_check(EE_par_100, F110E_RATED_POWER);
 	if ((temp2 < 2) || (temp2 > 6)) // check if motor is in selected range else reset to factory by next power-up

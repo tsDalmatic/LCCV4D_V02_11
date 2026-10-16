@@ -737,6 +737,11 @@
               <FileType>1</FileType>
               <FilePath>..\Src\modbus.c</FilePath>
             </File>
+              <File>
+                <FileName>custom_inverter.c</FileName>
+                <FileType>1</FileType>
+                <FilePath>..\Src\custom_inverter.c</FilePath>
+              </File>
             <File>
               <FileName>mtimer.c</FileName>
               <FileType>1</FileType>
