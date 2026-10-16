@@ -9,6 +9,7 @@
 #define   DIP_SW_INPUT_SAMPLES       120 // 200 with 2mS main cycle
 #define   DIP_SW_INPUT_SAMPLES_MAX   120 // 200 with 2mS main cycle
 #define   H_OLS_INPUT_SAMPLES        60  // 100 with 2mS main cycle
+#define COMMAND_INPUT_DEBOUNCE_MS    30U
 
 uint8_t ft_dip_sw3         = 120; // long filter for this reset at power up 11-11-2016
 int32_t htest = 0;               // debug test af hard fault
@@ -22,7 +23,6 @@ static uint8_t ft_stop_safety_chain  = 24;
 static uint8_t ft_kip_pb   = 60; // moved to inout.c 10-01-2022
 	  
 uint8_t ft_close_pb = 12;
-static uint8_t ft_close_disp_pb = 12;  
 	  
 static uint8_t ft_ex_auto   = 12;	// not in use yet but preparied for it
 static uint8_t ft_ols   = 9;	
@@ -39,6 +39,15 @@ static uint8_t ft_photo1   = 12;
 static uint8_t ft_dw8k2     = 12;
 //static uint8_t ft_ex_dw8k2  = 12; // 10-11-2021
 static uint8_t ft_fraba   = 3;
+static uint8_t open_pb_candidate;
+static uint8_t close_pb_candidate;
+static uint8_t open_disp_pb_candidate;
+static uint8_t close_disp_pb_candidate;
+static uint32_t open_pb_candidate_tick;
+static uint32_t close_pb_candidate_tick;
+static uint32_t open_disp_pb_candidate_tick;
+static uint32_t close_disp_pb_candidate_tick;
+volatile uint8_t input_sampling_active;
 // static uint8_t s_out_tim  = 0; // safety output pulse width 
 static uint8_t ft_mon_ph1 = 24; //
 static uint8_t ft_mon_ph2 = 24; //
@@ -70,8 +79,34 @@ void Delay_1uS() // at 48 MHz
 }
 //*******************************************************************
 
+static void update_command_input(uint8_t raw, uint8_t *filtered,
+                                 uint8_t *candidate, uint32_t *candidate_tick,
+                                 uint32_t now)
+{
+  raw = (raw != 0U) ? 1U : 0U;
+
+  if (raw == *filtered)
+  {
+    *candidate = raw;
+    *candidate_tick = now;
+  }
+  else if (raw != *candidate)
+  {
+    *candidate = raw;
+    *candidate_tick = now;
+  }
+  else if ((uint32_t)(now - *candidate_tick) >= COMMAND_INPUT_DEBOUNCE_MS)
+  {
+    *filtered = raw;
+  }
+}
+
+//*******************************************************************
+
 void read_inout()
  {
+  uint32_t now = HAL_GetTick();
+  input_sampling_active = 1U;
  // STOP Emergency Button sampling (input active low)
   if (e_stop_pb != HAL_GPIO_ReadPin(EMER_STOP_GPIO_Port, EMER_STOP_Pin) || !--ft_e_stop_pb) 
 	 {
@@ -129,40 +164,26 @@ void read_inout()
       if (stop_lid_pb) ft_stop_disp_pb = EXTENDED_INPUT_SAMPLES;
       else ft_stop_disp_pb = ORDINARY_INPUT_SAMPLES;
      } 
-    // OPEN Button on display unit (input active high)
-	  if ((open_disp_pb == bit_test(push_buttons,0)) || !--ft_open_disp_pb) 
-	   {
-		  if (!ft_open_disp_pb) open_disp_pb = !open_disp_pb;
-      ft_open_disp_pb = ORDINARY_INPUT_SAMPLES;
-     } 
-    // CLOSE Button on display unit (input active high)
-    if ((close_disp_pb == bit_test(push_buttons,1)) || !--ft_close_disp_pb)
- 	   {
-      if (!ft_close_disp_pb) close_disp_pb = !close_disp_pb;
-      ft_close_disp_pb = ORDINARY_INPUT_SAMPLES;
-     } 
+    // OPEN/CLOSE on the display unit use elapsed time so foreground load does
+    // not stretch the intended 30 ms debounce period.
+    update_command_input(bit_test(push_buttons,0), &open_disp_pb,
+                         &open_disp_pb_candidate, &open_disp_pb_candidate_tick, now);
+    update_command_input(bit_test(push_buttons,1), &close_disp_pb,
+                         &close_disp_pb_candidate, &close_disp_pb_candidate_tick, now);
    }
 	else
 	 {
     stop_disp_pb = 0;  // GDV1 not in use
 		open_disp_pb = 0;
     close_disp_pb = 0;		 
+		open_disp_pb_candidate = 0U;
+    close_disp_pb_candidate = 0U;
 	 }		
-	 // OPEN Button sampling (input active high)
-  if (open_pb == HAL_GPIO_ReadPin(OPEN_PB_GPIO_Port, OPEN_PB_Pin) || !--ft_open_pb) 
-	 {
-    if (!ft_open_pb)
-      open_pb = !open_pb;
-    ft_open_pb = ORDINARY_INPUT_SAMPLES;
-   }
-	
-	// CLOSE Button sampling (input active high)
-  if (close_pb == HAL_GPIO_ReadPin(CLOSE_PB_GPIO_Port, CLOSE_PB_Pin) || !--ft_close_pb)
- 	 {
-    if (!ft_close_pb)
-      close_pb = !close_pb;
-    ft_close_pb = ORDINARY_INPUT_SAMPLES;
-   }
+	 // Local OPEN/CLOSE buttons use the same fixed 30 ms debounce period.
+  update_command_input((uint8_t)HAL_GPIO_ReadPin(OPEN_PB_GPIO_Port, OPEN_PB_Pin),
+                       &open_pb, &open_pb_candidate, &open_pb_candidate_tick, now);
+  update_command_input((uint8_t)HAL_GPIO_ReadPin(CLOSE_PB_GPIO_Port, CLOSE_PB_Pin),
+                       &close_pb, &close_pb_candidate, &close_pb_candidate_tick, now);
 	 
 //
   if (mon_ph1 == HAL_GPIO_ReadPin(MON_PH1_3_GPIO_Port, MON_PH1_3_Pin) || !--ft_mon_ph1) 
@@ -415,4 +436,5 @@ else
  // if ((run_prog == 0) && ((parameter == 13) || (parameter == 15))) parameter = 1; // else ecode fail will hold stop
  //
  		
+  input_sampling_active = 0U;
 }
