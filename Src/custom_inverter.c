@@ -9,7 +9,7 @@ extern void stop(void);
 #define PROFILE_EEPROM 0x0200U
 #define PROFILE_MAGIC_ADDRESS 0x0224U
 #define PROFILE_CRC_ADDRESS 0x0226U
-#define PROFILE_MAGIC 0xC101U
+#define PROFILE_MAGIC 0xC102U
 #define HEARTBEAT_INTERVAL_MS 25U
 #define STATUS_INTERVAL_MS 250U
 static const InverterProfile baseline = {{370,230,26,3000,5000,0,5000,
@@ -25,6 +25,70 @@ static uint8_t step, field, waiting, initialized, enabled_before;
 static uint32_t heartbeat_tick, response_tick, last_ack_tick;
 static uint8_t suppress_service;
 static uint8_t profile_ok, heartbeat_started;
+static InverterProfile edit_profile;
+static uint8_t edit_menu, edit_active;
+
+static int8_t menu_field(uint8_t menu) {
+  static const uint8_t menus[INV_FIELD_COUNT] = {
+    100,101,102,103,104,105,109,110,111,112,113,114,120,121,122,123,124,0
+  };
+  for (uint8_t i=0; i<INV_FIELD_COUNT; ++i) if (menus[i] == menu) return (int8_t)i;
+  return -1;
+}
+
+static void normalize_profile(InverterProfile *p) {
+  uint16_t *w = p->words;
+  uint32_t synchronous_rpm;
+  if (w[INV_BASE_FREQ_X100_HZ] > w[INV_MAX_FREQ_X100_HZ])
+    w[INV_MAX_FREQ_X100_HZ] = w[INV_BASE_FREQ_X100_HZ];
+  if (w[INV_OPEN_HIGH] > w[INV_MAX_FREQ_X100_HZ])
+    w[INV_OPEN_HIGH] = w[INV_MAX_FREQ_X100_HZ];
+  if (w[INV_CLOSE_HIGH] > w[INV_MAX_FREQ_X100_HZ])
+    w[INV_CLOSE_HIGH] = w[INV_MAX_FREQ_X100_HZ];
+  if (w[INV_OPEN_LOW] > w[INV_OPEN_HIGH]) w[INV_OPEN_LOW] = w[INV_OPEN_HIGH];
+  if (w[INV_CLOSE_LOW] > w[INV_CLOSE_HIGH]) w[INV_CLOSE_LOW] = w[INV_CLOSE_HIGH];
+  synchronous_rpm = (120UL * w[INV_BASE_FREQ_X100_HZ]) /
+                    (100UL * w[INV_POLES]);
+  if (w[INV_RATED_RPM] > synchronous_rpm) w[INV_RATED_RPM] = (uint16_t)synchronous_rpm;
+  if (w[INV_RATED_RPM] < synchronous_rpm / 2U)
+    w[INV_RATED_RPM] = (uint16_t)(synchronous_rpm / 2U);
+}
+
+static uint16_t menu_min(uint8_t menu) {
+  switch (menu) {
+    case 100: return 100U;
+    case 101: return 100U;
+    case 102: return 1U;
+    case 103: return (uint16_t)((60UL * edit_profile.words[INV_BASE_FREQ_X100_HZ]) / 100UL / 2UL);
+    case 104: return 1000U;
+    case 109: return edit_profile.words[INV_BASE_FREQ_X100_HZ];
+    case 110: case 111: case 120: case 121: return 100U;
+    case 112: case 113: case 114: case 122: case 123: case 124: return 1U;
+    default: return 0U;
+  }
+}
+
+static uint16_t menu_max(uint8_t menu) {
+  switch (menu) {
+    case 100: return 2200U;
+    case 101: return 230U;
+    case 102: return 26U;
+    case 103: return (uint16_t)((60UL * edit_profile.words[INV_BASE_FREQ_X100_HZ]) / 100UL);
+    case 104: case 109: return 10000U;
+    case 110: case 120: return edit_profile.words[INV_MAX_FREQ_X100_HZ];
+    case 111: return edit_profile.words[INV_OPEN_HIGH];
+    case 121: return edit_profile.words[INV_CLOSE_HIGH];
+    case 112: case 113: case 114: case 122: case 123: case 124: return 100U;
+    default: return 0U;
+  }
+}
+
+static uint16_t menu_step(uint8_t menu) {
+  if (menu == 100U || menu == 103U) return 10U;
+  if (menu == 104U || menu == 109U || menu == 110U || menu == 111U ||
+      menu == 120U || menu == 121U) return 100U;
+  return 1U;
+}
 
 static void save_word(uint16_t address, uint16_t value) {
   EE_write(address, (uint8_t)value);
@@ -45,6 +109,8 @@ void CustomInverter_RequestConfiguration(void) {
   door_run_off;
 }
 void CustomInverter_Init(void) {
+  edit_active = 0U;
+  edit_menu = 0U;
   if (e21_fail) {
     initialized=1U; profile_ok=0U;
     CustomInverter_State=INV_REJECTED; CustomInverter_Error=INV_ERROR_RANGE;
@@ -65,16 +131,81 @@ void CustomInverter_Init(void) {
   profile_ok = 1U;
   CustomInverter_RequestConfiguration();
   if (e21_fail || load_word(PROFILE_CRC_ADDRESS) != InverterProfile_Crc(&profile, 0U) ||
-      InverterProfile_ValidatePhase1(&profile) != INV_ERROR_NONE) {
+      InverterProfile_Validate(&profile) != INV_ERROR_NONE) {
     CustomInverter_Error = INV_ERROR_RANGE; CustomInverter_State = INV_REJECTED;
     profile_ok = 0U;
   }
 }
 uint8_t CustomInverter_Ready(void) { return CustomInverter_State == INV_READY; }
 uint16_t CustomInverter_GetMenu(uint8_t menu) {
-  static const uint8_t menus[INV_FIELD_COUNT] = {100,101,102,103,104,105,109,110,111,112,113,114,120,121,122,123,124,0};
-  for (uint8_t i=0; i<INV_FIELD_COUNT; ++i) if (menus[i] == menu) return profile.words[i];
+  int8_t index = menu_field(menu);
+  if (index >= 0) return profile.words[(uint8_t)index];
   return 0U;
+}
+uint8_t CustomInverter_MenuEditable(uint8_t menu) {
+  return (menu_field(menu) >= 0 && menu != 105U) ? 1U : 0U;
+}
+void CustomInverter_BeginMenuEdit(uint8_t menu) {
+  if (!CustomInverter_MenuEditable(menu)) return;
+  if (!edit_active || edit_menu != menu) {
+    edit_profile = profile;
+    edit_menu = menu;
+    edit_active = 1U;
+  }
+}
+void CustomInverter_CancelMenuEdit(void) {
+  edit_active = 0U;
+  edit_menu = 0U;
+}
+uint16_t CustomInverter_GetMenuEditValue(uint8_t menu) {
+  int8_t index = menu_field(menu);
+  if (index < 0) return 0U;
+  if (edit_active && edit_menu == menu) return edit_profile.words[(uint8_t)index];
+  return profile.words[(uint8_t)index];
+}
+void CustomInverter_AdjustMenuEdit(uint8_t menu, int8_t direction) {
+  int8_t index;
+  uint16_t value, minimum, maximum, increment;
+  CustomInverter_BeginMenuEdit(menu);
+  if (!edit_active || edit_menu != menu || direction == 0) return;
+  index = menu_field(menu);
+  if (index < 0) return;
+  value = edit_profile.words[(uint8_t)index];
+  minimum = menu_min(menu);
+  maximum = menu_max(menu);
+  increment = menu_step(menu);
+  if (direction > 0) {
+    value = (value > (uint16_t)(maximum - ((maximum >= increment) ? increment : 0U))) ?
+            maximum : (uint16_t)(value + increment);
+    if (value > maximum) value = maximum;
+  } else {
+    value = (value <= minimum || value - minimum < increment) ?
+            minimum : (uint16_t)(value - increment);
+  }
+  edit_profile.words[(uint8_t)index] = value;
+  normalize_profile(&edit_profile);
+}
+uint8_t CustomInverter_CommitMenuEdit(uint8_t menu) {
+  if (!edit_active || edit_menu != menu ||
+      InverterProfile_Validate(&edit_profile) != INV_ERROR_NONE) return 0U;
+  save_word(PROFILE_MAGIC_ADDRESS, 0U);
+  for (uint8_t i=0; i<INV_FIELD_COUNT; ++i)
+    save_word(PROFILE_EEPROM + 2U*i, edit_profile.words[i]);
+  save_word(PROFILE_CRC_ADDRESS, InverterProfile_Crc(&edit_profile, 0U));
+  save_word(PROFILE_MAGIC_ADDRESS, PROFILE_MAGIC);
+  if (e21_fail) {
+    profile_ok = 0U;
+    CustomInverter_State = INV_REJECTED;
+    CustomInverter_Error = INV_ERROR_RANGE;
+    return 0U;
+  }
+  profile = edit_profile;
+  profile_ok = 1U;
+  CustomInverter_CancelMenuEdit();
+  CustomInverter_RestartRequired = 1U;
+  e27_modbus = 1U;
+  CustomInverter_RequestConfiguration();
+  return 1U;
 }
 static void failed(void) {
   CustomInverter_RestartRequired = 1U;

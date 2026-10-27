@@ -26,6 +26,7 @@ void parameter_adjust(void);
 void chk_para_tst(void);
 void req_val_change(uint8_t min, uint8_t max);
 void req_val_change_b16(uint16_t min, uint16_t max);
+static void adjust_custom_inverter_menu(uint8_t menu);
 void show_run(void);
 void reload_ser_cnt(void);
 void display_auto(void);
@@ -314,6 +315,52 @@ void back_to_parameter_num()
  e_tst_result = 0; // 02-01-2012
  p_value = 0; // switch to parameter number
  par_val = 0;
+}
+//***************************************************
+static void adjust_custom_inverter_menu(uint8_t menu)
+{
+ static uint8_t open_pb_tb;
+ static uint8_t close_pb_tb;
+ if ((open_pb == 1) | (open_disp_pb == 1))
+  {
+   value_changed = 1;
+   if (push_hold_tim == 0)
+    {
+     if (open_pb_tb != 0)
+      {
+       open_pb_tb = 0;
+       push_hold_tim = 30;
+      }
+    }
+   else if (open_pb_tb == 0)
+    {
+     CustomInverter_AdjustMenuEdit(menu, 1);
+     open_pb_tb = 1;
+    }
+  }
+ else open_pb_tb = 0;
+
+ if ((close_pb == 1) | (close_disp_pb == 1))
+  {
+   value_changed = 1;
+   if (push_hold_tim == 0)
+    {
+     if (close_pb_tb != 0)
+      {
+       close_pb_tb = 0;
+       push_hold_tim = 30;
+      }
+    }
+   else if (close_pb_tb == 0)
+    {
+     CustomInverter_AdjustMenuEdit(menu, -1);
+     close_pb_tb = 1;
+    }
+  }
+ else close_pb_tb = 0;
+
+ if ((!close_pb) && (!close_disp_pb) && (!open_pb) && (!open_disp_pb))
+  push_hold_tim = 150;
 }
 //***************************************************
 void parameter_adjust() // 11-10-2021
@@ -637,6 +684,15 @@ if (((temp == 54) || (temp == 53)) && (para_test == 1)) // if dock leveler half 
            p_value = 0;
            par_val = 0;
           }
+         break;
+         //
+         case 100: case 101: case 102: case 103: case 104: case 105:
+         case 109: case 110: case 111: case 112: case 113: case 114:
+         case 120: case 121: case 122: case 123: case 124:
+         if ((parameter == 105U) || CustomInverter_CommitMenuEdit(parameter))
+          back_to_parameter_num();
+         else
+          par_val = 0;
          break;
          //
          default:
@@ -1000,11 +1056,21 @@ else if (a_digit == 5)
  ds_byte[7] = 0; // not in use in prog mode yet
  //*********************************************************************************************************************
  //*********************************************************************************************************************
- /* Phase 1 exposes the transported profile read-only. Position percentages
-  * remain on the existing controller menu and EEPROM path. */
+ /* The custom inverter profile is edited locally. STOP commits the complete
+  * profile to EEPROM and starts a new configuration handshake. */
  if (LCC_CUSTOM_INVERTER && parameter >= 100U && parameter <= 124U && parameter != 115U) {
    static const uint8_t segments[10] = {0xC0,0xF9,0xA4,0xB0,0x99,0x92,0x82,0xF8,0x80,0x90};
-   uint16_t value = CustomInverter_GetMenu(parameter);
+   uint16_t value;
+   if (!p_value) {
+     CustomInverter_CancelMenuEdit();
+     value=CustomInverter_GetMenu(parameter);
+   } else if (CustomInverter_MenuEditable(parameter)) {
+     CustomInverter_BeginMenuEdit(parameter);
+     adjust_custom_inverter_menu(parameter);
+     value=CustomInverter_GetMenuEditValue(parameter);
+   } else {
+     value=CustomInverter_GetMenu(parameter);
+   }
    ds_byte[0]=1; ds_byte[1]=parameter; ds_byte[2]=0;
    ds_byte[3]=(uint8_t)value; ds_byte[4]=(uint8_t)(value>>8);
    new_EE=0U;

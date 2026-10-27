@@ -5,8 +5,8 @@
 
 /* Shared wire contract. Frequency is 0.01 Hz, current 0.1 A, time 0.1 s.
  * Power is watts; speed is nameplate rotor RPM. No LS power/slip encoding. */
-#define INV_PROTOCOL_VERSION 0x0101U
-#define INV_PROTOCOL_PHASE 1U
+#define INV_PROTOCOL_VERSION 0x0102U
+#define INV_PROTOCOL_PHASE 2U
 #define INV_HEARTBEAT_REGISTER 4U
 #define INV_LINK_TIMEOUT_MS 100U
 #define INV_CONFIG_BASE 0x0100U
@@ -59,7 +59,7 @@ static inline uint16_t InverterProfile_Validate(const InverterProfile *p) {
       w[INV_BASE_FREQ_X100_HZ] < 1000U || w[INV_BASE_FREQ_X100_HZ] > 10000U ||
       w[INV_MAX_FREQ_X100_HZ] < w[INV_BASE_FREQ_X100_HZ] ||
       w[INV_MAX_FREQ_X100_HZ] > 10000U || w[INV_AUTOTUNE] != 0U ||
-      (w[INV_POLES] != 2U && w[INV_POLES] != 4U && w[INV_POLES] != 6U))
+      w[INV_POLES] != 2U)
     return INV_ERROR_RANGE;
   uint32_t synchronous_rpm = (120UL * w[INV_BASE_FREQ_X100_HZ]) / (100UL * w[INV_POLES]);
   if (w[INV_RATED_RPM] == 0U || w[INV_RATED_RPM] > synchronous_rpm ||
@@ -71,24 +71,6 @@ static inline uint16_t InverterProfile_Validate(const InverterProfile *p) {
     for (uint8_t j = 2U; j <= 4U; ++j)
       if (w[i + j] < 1U || w[i + j] > 100U) return INV_ERROR_RANGE;
   }
-  return INV_ERROR_NONE;
-}
-
-/* Phase 1 transports the profile but only authorizes the commissioned drive.
- * Motion and V/f parameter application will be introduced in later phases. */
-static inline uint16_t InverterProfile_ValidatePhase1(const InverterProfile *p) {
-  uint16_t error = InverterProfile_Validate(p);
-  if (error != INV_ERROR_NONE) return error;
-  const uint16_t *w = p->words;
-  if (w[INV_POWER_W] != 370U || w[INV_VOLTAGE_V] != 230U ||
-      w[INV_CURRENT_X10_A] != 26U || w[INV_POLES] != 2U ||
-      w[INV_BASE_FREQ_X100_HZ] != 5000U || w[INV_MAX_FREQ_X100_HZ] != 5000U ||
-      w[INV_OPEN_HIGH] != 5000U || w[INV_CLOSE_HIGH] != 5000U ||
-      w[INV_OPEN_LOW] != 3500U || w[INV_CLOSE_LOW] != 3500U ||
-      w[INV_OPEN_ACC] != 5U || w[INV_CLOSE_ACC] != 5U ||
-      w[INV_OPEN_DEC] != 5U || w[INV_CLOSE_DEC] != 5U ||
-      w[INV_OPEN_STOP] != 5U || w[INV_CLOSE_STOP] != 5U)
-    return INV_ERROR_UNSUPPORTED;
   return INV_ERROR_NONE;
 }
 
