@@ -1079,9 +1079,11 @@ else if (a_digit == 5)
    if (a_digit>=1U && a_digit<=4U) {
      static const uint16_t divisors[4]={1000,100,10,1};
      a_secment=segments[(value/divisors[a_digit-1U])%10U];
-     if (p_value && ((parameter==100U && a_digit==1U) ||
+     if (p_value && parameter==100U && a_digit==1U && value<1000U)
+       a_secment=0xFFU;
+     if (p_value &&
          ((parameter==102U || parameter==112U || parameter==113U || parameter==114U ||
-           parameter==122U || parameter==123U || parameter==124U) && a_digit==3U)))
+           parameter==122U || parameter==123U || parameter==124U) && a_digit==3U))
        a_secment &= 0x7FU;
    }
    return;

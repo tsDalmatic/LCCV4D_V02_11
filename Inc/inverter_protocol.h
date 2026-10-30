@@ -21,6 +21,10 @@
 #define INV_PHASE_REGISTER 0x0028U
 #define INV_BEGIN_VALUE 0xB001U
 #define INV_COMMIT_VALUE 0xC001U
+#define INV_RATED_CURRENT_MIN_X10_A 1U
+#define INV_RATED_CURRENT_MAX_X10_A 90U
+#define INV_SUPPORTED_MOTOR_POLES 4U
+#define INV_SUPPORTED_MOTOR_POLE_PAIRS (INV_SUPPORTED_MOTOR_POLES / 2U)
 
 enum InverterField {
   INV_POWER_W, INV_VOLTAGE_V, INV_CURRENT_X10_A, INV_RATED_RPM,
@@ -55,11 +59,12 @@ static inline uint16_t InverterProfile_Validate(const InverterProfile *p) {
   const uint16_t *w = p->words;
   if (w[INV_POWER_W] == 0U || w[INV_POWER_W] > 2200U ||
       w[INV_VOLTAGE_V] < 100U || w[INV_VOLTAGE_V] > 230U ||
-      w[INV_CURRENT_X10_A] < 1U || w[INV_CURRENT_X10_A] > 26U ||
+      w[INV_CURRENT_X10_A] < INV_RATED_CURRENT_MIN_X10_A ||
+      w[INV_CURRENT_X10_A] > INV_RATED_CURRENT_MAX_X10_A ||
       w[INV_BASE_FREQ_X100_HZ] < 1000U || w[INV_BASE_FREQ_X100_HZ] > 10000U ||
       w[INV_MAX_FREQ_X100_HZ] < w[INV_BASE_FREQ_X100_HZ] ||
       w[INV_MAX_FREQ_X100_HZ] > 10000U || w[INV_AUTOTUNE] != 0U ||
-      w[INV_POLES] != 2U)
+      w[INV_POLES] != INV_SUPPORTED_MOTOR_POLES)
     return INV_ERROR_RANGE;
   uint32_t synchronous_rpm = (120UL * w[INV_BASE_FREQ_X100_HZ]) / (100UL * w[INV_POLES]);
   if (w[INV_RATED_RPM] == 0U || w[INV_RATED_RPM] > synchronous_rpm ||

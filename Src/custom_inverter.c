@@ -12,8 +12,8 @@ extern void stop(void);
 #define PROFILE_MAGIC 0xC102U
 #define HEARTBEAT_INTERVAL_MS 25U
 #define STATUS_INTERVAL_MS 250U
-static const InverterProfile baseline = {{370,230,26,3000,5000,0,5000,
-                                         5000,3500,5,5,5,5000,3500,5,5,5,2}};
+static const InverterProfile baseline = {{370,230,26,1500,5000,0,5000,
+                                         5000,3500,5,5,5,5000,3500,5,5,5,4}};
 static InverterProfile profile;
 volatile uint16_t CustomInverter_State;
 volatile uint16_t CustomInverter_Error;
@@ -58,8 +58,9 @@ static uint16_t menu_min(uint8_t menu) {
   switch (menu) {
     case 100: return 100U;
     case 101: return 100U;
-    case 102: return 1U;
-    case 103: return (uint16_t)((60UL * edit_profile.words[INV_BASE_FREQ_X100_HZ]) / 100UL / 2UL);
+    case 102: return INV_RATED_CURRENT_MIN_X10_A;
+    case 103: return (uint16_t)((120UL * edit_profile.words[INV_BASE_FREQ_X100_HZ]) /
+                                (100UL * INV_SUPPORTED_MOTOR_POLES * 2UL));
     case 104: return 1000U;
     case 109: return edit_profile.words[INV_BASE_FREQ_X100_HZ];
     case 110: case 111: case 120: case 121: return 100U;
@@ -72,8 +73,9 @@ static uint16_t menu_max(uint8_t menu) {
   switch (menu) {
     case 100: return 2200U;
     case 101: return 230U;
-    case 102: return 26U;
-    case 103: return (uint16_t)((60UL * edit_profile.words[INV_BASE_FREQ_X100_HZ]) / 100UL);
+    case 102: return INV_RATED_CURRENT_MAX_X10_A;
+    case 103: return (uint16_t)((120UL * edit_profile.words[INV_BASE_FREQ_X100_HZ]) /
+                                (100UL * INV_SUPPORTED_MOTOR_POLES));
     case 104: case 109: return 10000U;
     case 110: case 120: return edit_profile.words[INV_MAX_FREQ_X100_HZ];
     case 111: return edit_profile.words[INV_OPEN_HIGH];
@@ -97,6 +99,21 @@ static void save_word(uint16_t address, uint16_t value) {
 static uint16_t load_word(uint16_t address) {
   uint8_t low = EE_read(address);
   return (uint16_t)(low | ((uint16_t)EE_read(address + 1U) << 8));
+}
+static void persist_profile(const InverterProfile *p) {
+  save_word(PROFILE_MAGIC_ADDRESS, 0U);
+  for (uint8_t i=0; i<INV_FIELD_COUNT; ++i)
+    save_word(PROFILE_EEPROM + 2U*i, p->words[i]);
+  save_word(PROFILE_CRC_ADDRESS, InverterProfile_Crc(p, 0U));
+  save_word(PROFILE_MAGIC_ADDRESS, PROFILE_MAGIC);
+}
+static void migrate_legacy_two_pole_profile(void) {
+  if (profile.words[INV_POLES] != 2U) return;
+  profile.words[INV_POLES] = INV_SUPPORTED_MOTOR_POLES;
+  profile.words[INV_RATED_RPM] =
+    (uint16_t)((profile.words[INV_RATED_RPM] + 1U) / 2U);
+  normalize_profile(&profile);
+  persist_profile(&profile);
 }
 void CustomInverter_RequestConfiguration(void) {
   step = field = waiting = 0U;
@@ -126,6 +143,8 @@ void CustomInverter_Init(void) {
     save_word(PROFILE_MAGIC_ADDRESS, PROFILE_MAGIC);
   } else {
     for (uint8_t i = 0; i < INV_FIELD_COUNT; ++i) profile.words[i] = load_word(PROFILE_EEPROM + 2U*i);
+    if (load_word(PROFILE_CRC_ADDRESS) == InverterProfile_Crc(&profile, 0U))
+      migrate_legacy_two_pole_profile();
   }
   initialized = 1U; suppress_service = 0U;
   profile_ok = 1U;
@@ -188,11 +207,7 @@ void CustomInverter_AdjustMenuEdit(uint8_t menu, int8_t direction) {
 uint8_t CustomInverter_CommitMenuEdit(uint8_t menu) {
   if (!edit_active || edit_menu != menu ||
       InverterProfile_Validate(&edit_profile) != INV_ERROR_NONE) return 0U;
-  save_word(PROFILE_MAGIC_ADDRESS, 0U);
-  for (uint8_t i=0; i<INV_FIELD_COUNT; ++i)
-    save_word(PROFILE_EEPROM + 2U*i, edit_profile.words[i]);
-  save_word(PROFILE_CRC_ADDRESS, InverterProfile_Crc(&edit_profile, 0U));
-  save_word(PROFILE_MAGIC_ADDRESS, PROFILE_MAGIC);
+  persist_profile(&edit_profile);
   if (e21_fail) {
     profile_ok = 0U;
     CustomInverter_State = INV_REJECTED;
